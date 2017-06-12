@@ -16,6 +16,8 @@ import json
 import logging
 import threading
 
+import rpc.client as rpc_client
+
 LATE_INIT_LOCK = threading.Lock()
 
 LOG = logging.getLogger(__name__)
@@ -26,6 +28,7 @@ class HandlerBase(object):
     def __init__(self, a10_driver):
         self.a10_driver = a10_driver
         self.openstack_driver = self.a10_driver.openstack_driver
+        self.rpc_access = rpc_client.Client()
 
         if self.a10_driver.provider is None:
             with LATE_INIT_LOCK:
