@@ -18,7 +18,7 @@ import six
 from a10_openstack_lib.resources import a10_device_instance
 import a10_openstack_lib.resources.validators as a10_validators
 
-
+from neutron.api import extensions as nextensions
 from neutron.api.v2 import resource_helper
 # neutron.services got moved to neutron_lib
 try:
@@ -45,11 +45,15 @@ RESOURCE_ATTRIBUTE_MAP = resources.apply_template(a10_device_instance.RESOURCE_A
 attributes.add_validators(resources.apply_template(
     a10_validators.VALIDATORS, attributes.validators))
 
+_ALIAS = constants.A10_DEVICE_INSTANCE_EXT
+
 
 # TODO(rename this to *Extension to avoid config file confusion)
-class A10DeviceInstance(extensions.ExtensionDescriptor):
+class A10deviceinstance(extensions.ExtensionDescriptor):
 
-    @classmethod
+    nextensions.register_custom_supported_check(
+        _ALIAS, lambda: True, plugin_agnostic=True)
+
     def get_name(cls):
         return "A10 Device Instances"
 
@@ -83,7 +87,7 @@ class A10DeviceInstance(extensions.ExtensionDescriptor):
         return resources
 
     def update_attributes_map(self, attributes):
-        super(A10DeviceInstance, self).update_attributes_map(
+        super(A10deviceinstance, self).update_attributes_map(
             attributes,
             extension_attrs_map=RESOURCE_ATTRIBUTE_MAP)
 
@@ -121,7 +125,7 @@ class A10DeviceInstancePluginBase(ServicePluginBase):
     def get_plugin_type(self):
         return constants.A10_DEVICE_INSTANCE
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         super(A10DeviceInstancePluginBase, self).__init__()
 
     @abc.abstractmethod
@@ -143,3 +147,7 @@ class A10DeviceInstancePluginBase(ServicePluginBase):
     @abc.abstractmethod
     def update_a10_device_instance(self, context, id, a10_device_instance):
         pass
+
+# This is a terrible way of solving a backwards compatibility bug for casing
+class A10DeviceInstance(A10deviceinstance):
+    pass

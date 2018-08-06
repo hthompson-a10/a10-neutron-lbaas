@@ -15,12 +15,11 @@
 import mock
 
 import a10_neutron_lbaas.a10_exceptions as a10_ex
-
 import fake_objs
 import test_base
 
 
-class TestLB(test_base.UnitTestBase):
+class TestLB(test_base.HandlerTestBase):
 
     def test_create(self):
         m = fake_objs.FakeLoadBalancer()
@@ -120,12 +119,34 @@ class TestLB(test_base.UnitTestBase):
         except a10_ex.UnsupportedFeature:
             pass
 
+    def test_stats_v30(self):
+        test_lb = fake_objs.FakeLoadBalancer()
+        test_lb.stats_v30()
+        c = mock.MagicMock()
+        c.client.slb.virtual_server.get = mock.Mock(return_value=test_lb.virt_server)
+        c.client.slb.service_group.stats = mock.Mock(return_value=test_lb.service_group)
+        c.client.slb.service_group.get = mock.Mock(return_value=test_lb.members)
+        ret_val = self.a.lb._stats_v30(c, test_lb.port_list, None)
+
+        self.print_mocks()
+        self.assertEqual(ret_val, test_lb.ret_stats_v30)
+
+    def test_stats_v21(self):
+        test_lb = fake_objs.FakeLoadBalancer()
+        test_lb.stats_v21()
+        c = mock.MagicMock()
+        c.client.slb.virtual_service.get = mock.Mock(return_value=test_lb.virt_service)
+        c.client.slb.service_group.stats = mock.Mock(return_value=test_lb.serv_group)
+        ret_val = self.a.lb._stats_v21(c, test_lb.virt_server)
+
+        self.print_mocks()
+        self.assertEqual(ret_val, test_lb.ret_stats)
+
     def test_stats(self):
         test_lb = fake_objs.FakeLoadBalancer()
         self.a.lb.stats(None, test_lb)
 
         self.print_mocks()
-
         s = str(self.a.last_client.mock_calls)
         self.assertTrue('call.slb.virtual_server.stats' in s)
 
@@ -134,3 +155,58 @@ class TestLB(test_base.UnitTestBase):
             raise e(msg)
 
         return lambda *args, **kwargs: raise_exception(e, msg)
+
+    def _test_create_expressions(self, os_name, pattern, expressions=None):
+        self.a.config.get_virtual_server_expressions = self._get_expressions_mock
+        expressions = expressions or self.a.config.get_virtual_server_expressions()
+        expected = expressions.get(pattern, {}).get("json", None) or ""
+
+        m = fake_objs.FakeLoadBalancer()
+        m.name = os_name
+        handler = self.a.lb
+        handler.create(None, m)
+
+        s = str(self.a.last_client.mock_calls)
+        self.assertIn("virtual_server.create", s)
+        self.assertIn(str(expected), s)
+
+    def test_create_expressions_none(self):
+        self._test_create_expressions("mylb", None, {})
+
+    def test_create_expressions_match_beginning(self):
+        self._test_create_expressions("securelb", self.EXPR_BEGIN)
+
+    def test_create_expressions_match_end(self):
+        self._test_create_expressions("lbweb", self.EXPR_END)
+
+    def test_create_expressions_match_charclass(self):
+        self._test_create_expressions("lbwwlb", self.EXPR_CLASS)
+
+    def test_create_expressions_nomatch(self):
+        self.a.config.get_virtual_server_expressions = self._get_expressions_mock
+        expressions = self.a.config.get_virtual_server_expressions()
+        expected = expressions.get(self.EXPR_BEGIN, {}).get("json", None) or ""
+
+        m = fake_objs.FakeLoadBalancer()
+        m.name = "mylb"
+        handler = self.a.lb
+        handler.create(None, m)
+
+        s = str(self.a.last_client.mock_calls)
+        self.assertIn("virtual_server.create", s)
+        self.assertNotIn(str(expected), s)
+
+    def test_create_noname_noexception(self):
+        self.a.config.get_virtual_server_expressions = self._get_expressions_mock
+        expressions = self.a.config.get_virtual_server_expressions()
+
+        expected = expressions.get(self.EXPR_BEGIN, {}).get("json", None) or ""
+
+        m = fake_objs.FakeLoadBalancer()
+        m.name = None
+        handler = self.a.lb
+        handler.create(None, m)
+
+        s = str(self.a.last_client.mock_calls)
+        self.assertIn("virtual_server.create", s)
+        self.assertNotIn(str(expected), s)

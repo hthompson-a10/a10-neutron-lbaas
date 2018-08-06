@@ -5,8 +5,8 @@ A10 Networks LBaaS Driver for Thunder, vThunder and AX Series Appliances
 
 Supported releases:
 
-* OpenStack: Icehouse, Juno, Kilo, Liberty, Mitaka
-* LBaaS versions: v1, v2
+* OpenStack: Liberty - Queens Releases
+* LBaaS versions: v2
 * ACOS versions: ACOS 2/AxAPI 2.1 (ACOS 2.7.2+), ACOS 4/AxAPI 3.0 (ACOS 4.0.1-GA +)
 
 Working but not available for support:
@@ -15,7 +15,7 @@ Working but not available for support:
 
 Unsupported, but may work with minor tweaking:
 
-* OpenStack: Havana
+* OpenStack: v1 on any release, v2 Havana through Kilo
 
 ## A10 github repos
 
@@ -72,7 +72,7 @@ Post-installation configuration requires modification of your neutron.conf or ne
 
 ### LBaaS v1 configuration
 Open `/etc/neutron/neutron.conf` in your preferred text editor.
-Under the `service_plugins` setting, ensure `lbaas` is listed.
+Under the `service_plugins` setting, ensure `lbaas` or `lbaasv2` is listed depending on your configuration.
 
 In the list of `service_provider` settings, add a service provider for A10
 Networks:
@@ -110,6 +110,7 @@ devices = {
         "password": "a10",
         "autosnat": True,
         "api_version": "3.0",
+    }
 }
 ```
 
@@ -306,6 +307,12 @@ Login to the GUI on your Thunder or AX device, and validate which configuration 
 ![image10](https://cloud.githubusercontent.com/assets/1424573/2849596/4718b0b4-d0df-11e3-9a6b-506bb832dcce.png)
 
 _Repeat this for all configuration steps, then delete all resources if ADPs are configured. They should be deleted when the tenant has no more resources configured._
+
+## Default and Name-based configuration
+See [name-based config example](https://github.com/a10networks/a10-neutron-lbaas/tree/master/a10_neutron_lbaas/etc) for details.
+
+## Changes
+See [CHANGELOG](https://github.com/a10networks/a10-neutron-lbaas/tree/master/CHANGELOG) for changes made. NOTE: We didn't have a changelog until 1.6.5
 
 ## A10 Community
 

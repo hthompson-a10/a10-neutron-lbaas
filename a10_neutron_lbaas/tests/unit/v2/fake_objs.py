@@ -21,6 +21,7 @@ class FakeModel(object):
         self.id = kwargs.get('id', 'fake-id-001')
         self.tenant_id = kwargs.get('tenant_id', 'get-off-my-lawn')
         self.root_loadbalancer = None
+        self.name = kwargs.get("name", "fake-name")
 
 
 class FakePort(FakeModel):
@@ -47,6 +48,116 @@ class FakeLoadBalancer(FakeModel):
         self.vip_subnet_id = "fake-subnet-id-001"
         self.pools = []
 
+    def stats_v21(self):
+        self.ret_stats = {
+            "bytes_in": 1337,
+            "bytes_out": 347,
+            "active_connections": 101,
+            "total_connections": 1337,
+            "extended_stats": {
+                "loadbalancer_stat": {
+                    "req_bytes": 1337,
+                    "resp_bytes": 347,
+                    "cur_conns": 101,
+                    "tot_conns": 1337,
+                    "listener_stat": [{
+                        "req_bytes": 1337,
+                        "resp_bytes": 347,
+                        "name": "3LD3RB33R135",
+                        "cur_conns": 101,
+                        "tot_conns": 1337,
+                        "pool_stat_list": {
+                            "cur_conns": 0,
+                            "member_stat_list": [{
+                                "req_bytes": 0,
+                            }]
+                        }
+                    }]
+                }
+            }
+        }
+
+        self.virt_server = {
+            "virtual_server_stat": {
+                "req_bytes": 1337,
+                "resp_bytes": 347,
+                "cur_conns": 101,
+                "tot_conns": 1337,
+                "vport_stat_list": [{
+                    "req_bytes": 1337,
+                    "resp_bytes": 347,
+                    "cur_conns": 101,
+                    "tot_conns": 1337,
+                    "name": "3LD3RB33R135"
+                }]
+            }
+        }
+
+        self.virt_service = {
+            "virtual_service": {
+                "service_group": "3LD3RB33R135"}
+        }
+
+        self.serv_group = {
+            'service_group_stat': {
+                'cur_conns': 0,
+                'member_stat_list': [{
+                    'req_bytes': 0}]}
+        }
+
+    def stats_v30(self):
+        self.ret_stats_v30 = {
+            "bytes_in": 1337,
+            "bytes_out": 347,
+            "active_connections": 101,
+            "total_connections": 1337,
+            "extended_stats": {
+                "loadbalancer_stat": {
+                    "total_fwd_bytes": 1337,
+                    "total_rev_bytes": 347,
+                    "curr_conn": 101,
+                    "total_conn": 1337,
+                    "listener_stat": [{
+                        "stats": {
+                            "total_fwd_bytes": 1337,
+                            "total_rev_bytes": 347,
+                            "curr_conn": 101,
+                            "total_conn": 1337}}],
+                    "pool_stat_list": {
+                        'curr_conn': 0,
+                        "service_peak_conn": 0,
+                        "member_list": [{
+                            "stats": {
+                                "curr_conn": 0}}]}}}
+        }
+
+        self.port_list = {
+            "port-list": [{
+                "stats": {
+                    "total_fwd_bytes": 1337,
+                    "total_rev_bytes": 347,
+                    "curr_conn": 101,
+                    "total_conn": 1337}}]
+        }
+
+        self.virt_server = {
+            "virtual-server": {
+                "port-list": [{
+                    "service-group": "3LD3RB33R135"}]}
+        }
+
+        self.service_group = {
+            "service-group": {
+                "stats": {
+                    "service_peak_conn": 0}}
+        }
+
+        self.members = {
+            "member-list": [{
+                "stats": {
+                    "curr_conn": 0}}]
+        }
+
 
 class FakeListener(FakeModel):
 
@@ -54,6 +165,7 @@ class FakeListener(FakeModel):
                  loadbalancer=None, container_id=None, containers=None):
         super(FakeListener, self).__init__()
         self.id = 'fake-listen-id-001'
+        self.name = 'openstackname'
         self.protocol = protocol
         self.protocol_port = port
         self.admin_state_up = admin_state_up

@@ -27,11 +27,14 @@ class HealthMonitorHandler(handler_base_v2.HandlerBaseV2):
     def _name(self, hm):
         return hm.id[0:28]
 
-    def _set(self, c, set_method, context, hm):
+    def _set(self, c, set_method, context, hm, **kwargs):
         hm_name = self._meta_name(hm)
         method = None
         url = None
         expect_code = None
+        os_name = hm.name
+        port = kwargs.get("port") 
+
         if hm.type in ['HTTP', 'HTTPS']:
             method = hm.http_method
             url = hm.url_path
@@ -43,7 +46,8 @@ class HealthMonitorHandler(handler_base_v2.HandlerBaseV2):
 
         set_method(hm_name, openstack_mappings.hm_type(c, hm.type),
                    hm.delay, hm.timeout, hm.max_retries,
-                   method=method, url=url, expect_code=expect_code,
+                   method=method, url=url, expect_code=expect_code, port=port,
+                   config_defaults=self._get_config_defaults(c, os_name),
                    axapi_args=args)
 
     def _ensure_timeout_does_not_exceed_delay(self, hm):
@@ -55,9 +59,16 @@ class HealthMonitorHandler(handler_base_v2.HandlerBaseV2):
             self._pool_name(context, pool=hm.pool),
             health_monitor="", health_check_disable=True)
 
-    def _create(self, c, context, hm):
+    def _create(self, c, context, hm, **kwargs):
         try:
-            self._set(c, c.client.slb.hm.create, context, hm)
+            listener = self.neutron.hm_get_listener(context, hm)
+            kwargs["port"] = listener.protocol_port
+        except:
+            LOG.warn("Listener for HM could not be located")
+
+        # Send listener port to acos create
+        try:
+            self._set(c, c.client.slb.hm.create, context, hm, **kwargs)
         except acos_errors.Exists:
             pass
 
@@ -70,10 +81,10 @@ class HealthMonitorHandler(handler_base_v2.HandlerBaseV2):
             self._pool_name(context, pool=hm.pool),
             health_monitor=self._meta_name(hm), health_check_disable=False)
 
-    def create(self, context, hm):
+    def create(self, context, hm, **kwargs):
         LOG.debug("HealthMonitorHandler.create(): hm=%s, context=%s" % (dir(hm), context))
         with a10.A10WriteStatusContext(self, context, hm) as c:
-            self._create(c, context, hm)
+            self._create(c, context, hm, **kwargs)
 
     def update(self, context, old_hm, hm):
         with a10.A10WriteStatusContext(self, context, hm) as c:
@@ -105,3 +116,8 @@ class HealthMonitorHandler(handler_base_v2.HandlerBaseV2):
     def delete(self, context, hm):
         with a10.A10DeleteContext(self, context, hm) as c:
             self._delete(c, context, hm)
+
+    def _get_expressions(self, c):
+        rv = {}
+        rv = c.a10_driver.config.get_monitor_expressions()
+        return rv

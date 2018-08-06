@@ -62,7 +62,7 @@ class ListenerHandler(handler_base_v2.HandlerBaseV2):
         template_args = {}
         protocol = openstack_mappings.vip_protocols(c, listener.protocol)
         binding = None
-
+        os_name = listener.name or None
         # Try Barbican first.  TERMINATED HTTPS requires a default TLS container ID that is
         # checked by the API so we can't fake it out.
         if listener.protocol and listener.protocol == constants.PROTOCOL_TERMINATED_HTTPS:
@@ -116,7 +116,8 @@ class ListenerHandler(handler_base_v2.HandlerBaseV2):
                 c.client.slb.template.client_ssl.create(
                     template_name,
                     cert=cert_filename,
-                    key=key_filename)
+                    key=key_filename,
+                    passphrase=key_passphrase)
             except acos_errors.Exists:
                 c.client.slb.template.client_ssl.update(template_name, cert=cert_filename,
                                                         key=key_filename, passphrase=key_passphrase)
@@ -129,11 +130,13 @@ class ListenerHandler(handler_base_v2.HandlerBaseV2):
                     template_name,
                     cert_filename,
                     key_filename,
+                    passphrase=key_passphrase,
                     axapi_args=server_args)
             except acos_errors.Exists:
                 c.client.slb.template.server_ssl.update(template_name,
                                                         cert_filename,
                                                         key_filename,
+                                                        passphrase=key_passphrase,
                                                         axapi_args=server_args)
 
         try:
@@ -146,6 +149,7 @@ class ListenerHandler(handler_base_v2.HandlerBaseV2):
 
         # This doesn't do anything anymore.
         vport_meta = self.meta(listener.loadbalancer, 'vip_port', {})
+        template_args.update(**self._get_vport_defaults(c, os_name))
 
         try:
             set_method(
@@ -160,6 +164,8 @@ class ListenerHandler(handler_base_v2.HandlerBaseV2):
                 autosnat=c.device_cfg.get('autosnat'),
                 ipinip=c.device_cfg.get('ipinip'),
                 source_nat_pool=c.device_cfg.get('source_nat_pool'),
+                # Device-level defaults
+                vport_defaults=self._get_vport_defaults(c, os_name),
                 axapi_body=vport_meta,
                 **template_args)
         except acos_errors.Exists:
@@ -174,7 +180,8 @@ class ListenerHandler(handler_base_v2.HandlerBaseV2):
         # if there's a barbican container ID, check there.
         if c_id:
             try:
-                container = self.barbican_client.get_certificate(c_id, check_only=True)
+                container = self.barbican_client.get_certificate(c_id, check_only=True,
+                                                                 project_id=c.tenant_id)
             except Exception as ex:
                 container = None
                 LOG.error("Exception encountered retrieving TLS Container %s" % c_id)
@@ -310,3 +317,23 @@ class ListenerHandler(handler_base_v2.HandlerBaseV2):
             except Exception as ex:
                 LOG.exception(ex)
         return binding
+
+    def _get_global_vport_defaults(self, c):
+        return c.a10_driver.config.get_vport_defaults()
+
+    def _get_device_vport_defaults(self, c):
+        return c.device_cfg.get("vport_defaults")
+
+    def _get_vport_defaults(self, c, vport_name):
+        rv = {}
+        # Device-specific defaults have precedence over global
+        rv.update(self._get_global_vport_defaults(c))
+        rv.update(self._get_device_vport_defaults(c))
+        if vport_name and len(vport_name) > 0:
+            self._get_name_matches(rv, vport_name, self._get_expressions(c))
+        return rv
+
+    def _get_expressions(self, c):
+        rv = {}
+        rv = c.a10_driver.config.get_vport_expressions()
+        return rv
